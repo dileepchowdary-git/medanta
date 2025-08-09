@@ -13,8 +13,7 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from credentials import CLICKHOUSE_CONFIG
 from prefect import flow, task
-from prefect.tasks import task_input_hash
-from datetime import timedelta
+from datetime import datetime
 
 # --- CONFIGURATION ---
 SERVICE_ACCOUNT_FILE = "/Users/dileep/medanta/credentials.json"
@@ -36,7 +35,7 @@ def open_sheet():
 
 
 # --- PREFECT TASKS ---
-@task(retries=2, retry_delay_seconds=10, cache_policy=None)  # disable caching
+@task(retries=2, retry_delay_seconds=10, cache_policy=None)
 def run_query_and_write(tab_name: str, sql_file: str):
     ch_client = get_client(**CLICKHOUSE_CONFIG)
     sheet = open_sheet()
@@ -64,6 +63,27 @@ def run_query_and_write(tab_name: str, sql_file: str):
     print(f"✅ Updated: {tab_name} ({len(df)} rows)")
 
 
+from datetime import datetime
+from prefect import task
+
+@task
+def update_formula_tabs():
+    sheet = open_sheet()
+    tabs = [
+        "Medanta Volume & TAT Details",
+        "Medanta EQC_reject"
+    ]
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    for tab_name in tabs:
+        try:
+            ws = sheet.worksheet(tab_name)
+            ws.update([[f"Last Updated: {timestamp}"]], range_name="A1")
+            print(f"✅ Updated timestamp in {tab_name}")
+        except Exception as e:
+            print(f"❌ Could not update {tab_name}: {e}")
+
+
 @flow(name="Medanta-GSheet-Update")
 def medanta_flow():
     print("🔁 Starting Medanta report update...")
@@ -77,6 +97,9 @@ def medanta_flow():
 
     for tab_name, sql_file in tasks:
         run_query_and_write(tab_name, sql_file)
+
+    # ✅ Update the two formula tabs
+    update_formula_tabs()
 
     print("✅ All Medanta tabs processed.")
 
