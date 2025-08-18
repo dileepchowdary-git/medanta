@@ -39,4 +39,5 @@ dist/
 build/
 *.spec
 # :package: NodeJS (if any frontend work is involved)
-node_modules/
+node_modules/credentials.json
+credentials.py
