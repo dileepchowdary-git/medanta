@@ -16,7 +16,7 @@ from prefect import flow, task
 from datetime import datetime
 
 # --- CONFIGURATION ---
-SERVICE_ACCOUNT_FILE = "/Users/dileep/medanta/credentials.json"
+SERVICE_ACCOUNT_FILE = "/root/medanta/credentials.json"
 SHEET_ID = "1nyi9r6D9Wjqo6SXmM6ZKcOB43-T4gEDc3qNualSn9go"
 SQL_DIR = os.path.join(os.path.dirname(__file__), "sql")
 MEDANTA_FILTER = "AND lower(c.client_name) LIKE '%medanta%'"
@@ -34,8 +34,7 @@ def open_sheet():
     return client.open_by_key(SHEET_ID)
 
 
-# --- PREFECT TASKS ---
-@task(retries=2, retry_delay_seconds=10, cache_policy=None)
+@task(retries=2, retry_delay_seconds=10)
 def run_query_and_write(tab_name: str, sql_file: str):
     ch_client = get_client(**CLICKHOUSE_CONFIG)
     sheet = open_sheet()
@@ -53,6 +52,12 @@ def run_query_and_write(tab_name: str, sql_file: str):
         print(f"❌ Error executing query for {tab_name}: {e}")
         return
 
+    # --- ADD THIS CHECK ---
+    if df.empty:
+        print(f"⚠️ Query for {tab_name} returned no data. Skipping update.")
+        return
+    # -----------------------
+
     try:
         worksheet = sheet.worksheet(tab_name)
         worksheet.clear()
@@ -61,7 +66,6 @@ def run_query_and_write(tab_name: str, sql_file: str):
 
     set_with_dataframe(worksheet, df)
     print(f"✅ Updated: {tab_name} ({len(df)} rows)")
-
 
 from datetime import datetime
 from prefect import task

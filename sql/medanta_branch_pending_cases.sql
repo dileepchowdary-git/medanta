@@ -7,7 +7,10 @@ SELECT
     s.patient_id AS MR_No_,
     s.patient_age AS Patient_Age,
     arrayStringConcat(tokens(simpleJSONExtractRaw(assumeNotNull(REPLACE(s.rules, '\\', '')), 'list')), ' ') AS Study_Name,
-    s.modalities AS Modality,
+    CASE
+        WHEN s.modalities = 'XRAY' AND simpleJSONExtractInt(assumeNotNull(REPLACE(s.rules, '\\', '')), 'mod_study') = 43 THEN 'XRAY Special'
+        ELSE s.modalities
+    END AS Modality,
     CASE
         WHEN length(JSONExtractArrayRaw(assumeNotNull(REPLACE(s.rules, '\\', '')), 'list')) >= 2 THEN 'NON-BIONIC'
         WHEN (
@@ -22,7 +25,7 @@ SELECT
         ELSE 'NON-BIONIC'
     END AS Report_Type,
     ss.min_time AS Activated_Time_on_5C_Platform,
-    ss2.status AS Status,
+    'PENDING' AS Status,
     CASE
         WHEN toHour(ss.min_time) >= 8 AND toHour(ss.min_time) < 20 THEN '8AM - 8PM'
         ELSE '8PM - 8AM'
@@ -37,29 +40,16 @@ LEFT JOIN (
     FROM transform.StudyStatuses
     GROUP BY study_fk
 ) AS ss ON ss.study_fk = s.id
-LEFT JOIN transform.StudyStatuses AS ss2 ON ss2.study_fk = s.id
-WHERE lower(c.client_name) LIKE '%medanta%'
-  AND ss2.status = 'PENDING'
-  AND toDate(s.created_at) BETWEEN date_trunc('month', now()) AND toDate(now())
+WHERE
+    lower(c.client_name) LIKE '%medanta%'
+    -- This condition defines "pending"
+    AND s.id NOT IN (
+        SELECT study_fk
+        FROM transform.StudyStatuses
+        WHERE status IN ('MERGED', 'DELETED', 'COMPLETED')
+    )
+    -- Cases created from the 1st of this month to today
+    AND toDate(s.created_at) BETWEEN date_trunc('month', now()) AND toDate(now())
 ORDER BY
     Client_Name,
-    Study_ID
-UNION ALL
-SELECT
-    NULL AS Date,
-    NULL AS Study_ID,
-    NULL AS Client_ID,
-    NULL AS Client_Name,
-    NULL AS "5C_Order_ID",
-    NULL AS MR_No_,
-    NULL AS Patient_Age,
-    NULL AS Study_Name,
-    NULL AS Modality,
-    NULL AS Report_Type,
-    NULL AS Activated_Time_on_5C_Platform,
-    'PENDING' AS Status,
-    NULL AS Timeframe,
-    NULL AS Hours,
-    NULL AS Study_Link,
-    NULL AS Date_Hour
-LIMIT 0;
+    Study_ID;

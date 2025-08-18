@@ -19,7 +19,10 @@ base AS (
         arrayStringConcat(tokens(simpleJSONExtractRaw(assumeNotNull(REPLACE(s.rules, '\\', '')), 'list')), ' ') AS Study_Name,
         length(JSONExtractArrayRaw(assumeNotNull(REPLACE(s.rules, '\\', '')), 'list')) AS Study_Count,
         s.patient_age AS Patient_Age,
-        s.modalities AS Modality,
+        CASE
+            WHEN s.modalities = 'XRAY' AND simpleJSONExtractInt(assumeNotNull(REPLACE(s.rules, '\\', '')), 'mod_study') = 43 THEN 'XRAY Special'
+            ELSE s.modalities
+        END AS Modality,
         ss.min_time AS Activated_Time_on_5C_Platform,
         sc.max_time AS Completed_Time_on_5C_Platform,
         toHour(ss.min_time) AS Hours,

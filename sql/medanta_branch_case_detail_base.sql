@@ -19,7 +19,10 @@ base AS (
         s.patient_age AS Patient_Age,
         length(JSONExtractArrayRaw(assumeNotNull(REPLACE(s.rules, '\\', '')), 'list')) AS Study_Count,
         arrayStringConcat(tokens(simpleJSONExtractRaw(assumeNotNull(REPLACE(s.rules, '\\', '')), 'list')), ' ') AS Study_Name,
-        s.modalities AS Modality,
+        CASE
+            WHEN s.modalities = 'XRAY' AND simpleJSONExtractInt(assumeNotNull(REPLACE(s.rules, '\\', '')), 'mod_study') = 43 THEN 'XRAY Special'
+            ELSE s.modalities
+        END AS Modality,
         m.created_datetime AS Activated_Time_on_5C_Platform,
         m.completed_datetime AS Completed_Time_on_5C_Platform,
         m.tat_min AS Reported_TAT,
@@ -73,9 +76,10 @@ SELECT
     TAT_Applicable,
     Date_Hour,
     CASE
+        WHEN Modality = 'XRAY Special' AND Reported_TAT > 180 THEN 1
         WHEN Modality LIKE '%XRAY%' AND Reported_TAT > 60 THEN 1
-        WHEN Modality LIKE '%CT%' AND Reported_TAT > 120 THEN 1
-        WHEN Modality LIKE '%MRI%' AND Reported_TAT > 180 THEN 1
+        WHEN Modality LIKE '%CT%' AND Reported_TAT > 180 THEN 1
+        WHEN Modality LIKE '%MRI%' AND Reported_TAT > 240 THEN 1
         WHEN Modality LIKE '%NM%' AND Reported_TAT > (24 * 60) THEN 1
         ELSE 0
     END AS Reported_TAT_breach,
@@ -83,9 +87,12 @@ SELECT
         WHEN Hours >= 8 AND Hours < 20 THEN '8AM - 8PM'
         ELSE '8PM - 8AM'
     END AS Timeframe,
-    Study_Link
+    Study_Link,
+    CASE
+        WHEN toInt32OrZero(replaceRegexpAll(Patient_Age, '[^0-9]', '')) < 15 THEN 'Pediatric'
+        ELSE 'Elder'
+    END AS Patient_Type
 FROM base
--- This CTE correctly identifies the final reporting type based on the latest status change.
 LEFT JOIN (
     SELECT
         study_fk,
@@ -97,7 +104,6 @@ LEFT JOIN (
     WHERE status = 'REPORTED'
     GROUP BY study_fk
 ) AS last_reported ON last_reported.study_fk = base.Study_ID
--- Join to AIModelResponses based on the LATEST report ID found in the base CTE.
 LEFT JOIN (
     SELECT
         report_fk,

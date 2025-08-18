@@ -1,5 +1,42 @@
-credentials.json
+__pycache__/
+*.py[cod]
+*.so
+# :package: Virtual environment folders
+venv/
+env/
+# :closed_lock_with_key: Secret environment files
 .env
-credentials.json
-.env
-credentials.py
+.env.*
+*.env
+# :notebook: Jupyter notebooks (optional, remove if you're using them)
+.ipynb_checkpoints/
+# :file_folder: OS + Editor junk
+.DS_Store
+Thumbs.db
+.vscode/
+# :bar_chart: Data science / ML outputs (optional)
+*.csv
+*.xlsx
+*.pkl
+*.joblib
+*.npy
+*.npz
+data/
+models/
+# :test_tube: Test reports and cache
+*.log
+*.tmp
+*.cache/
+.pytest_cache/
+__pypackages__/
+# :gear: Prefect or workflow metadata
+.prefect/
+.orion/
+*.db
+# :card_index_dividers: Compiled files
+*.egg-info/
+dist/
+build/
+*.spec
+# :package: NodeJS (if any frontend work is involved)
+node_modules/
